@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_URL = 'https://p33279i881.vicp.fun/v1/chat/completions';
-const API_KEY = import.meta.env.VITE_AI_API_KEY || 'sk-hw8jl0AvZ3SoFFPZ6a103bC7C15943569fC66002437c7f09';
+const API_KEY = 'sk-hw8jl0AvZ3SoFFPZ6a103bC7C15943569fC66002437c7f09';
 
 export interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -43,8 +43,15 @@ export async function callAI(messages: Message[], model: ModelType = 'moonshot-v
     };
 
     console.log('[API Call] 发送请求到:', API_URL);
+    console.log('[API Call] 请求头:', JSON.stringify(headers, null, 2));
+    console.log('[API Call] 请求体:', JSON.stringify(payload, null, 2));
     console.time('API Response Time');
-    const response = await axios.post(API_URL, payload, { headers, timeout: 30000 });
+    
+    const response = await axios.post(API_URL, payload, { 
+      headers,
+      timeout: 30000, // 设置30秒超时
+    });
+    
     console.timeEnd('API Response Time');
 
     if (response.status === 200) {
@@ -62,14 +69,12 @@ export async function callAI(messages: Message[], model: ModelType = 'moonshot-v
         console.error('[API Call] 响应数据:', error.response.data);
         console.error('[API Call] 响应状态:', error.response.status);
         console.error('[API Call] 响应头:', error.response.headers);
-        throw new Error(`网络请求失败: ${error.response.status} ${error.response.statusText}. 详情: ${JSON.stringify(error.response.data)}`);
       } else if (error.request) {
-        console.error('[API Call] 未收到响应:', error.request);
-        throw new Error('网络请求失败: 未收到服务器响应，请检查网络连接或服务器状态');
-      } else {
-        console.error('[API Call] 设置请求时发生错误:', error.message);
-        throw new Error(`网络请求设置失败: ${error.message}`);
+        console.error('[API Call] 请求配置:', error.config);
+        console.error('[API Call] 请求详情:', error.request);
       }
+      console.error('[API Call] 错误消息:', error.message);
+      throw new Error(`网络请求失败: ${error.message}`);
     } else {
       console.error('[API Call] 非 Axios 错误:', error);
       throw new Error('未知错误，请查看控制台日志');
