@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { callAI, Message as AIMessage, ModelType } from '../services/aiService';
 import ReactMarkdown from 'react-markdown';
 import { Settings, Plus } from 'lucide-react';
@@ -11,13 +11,26 @@ interface AnalysisPanelProps {
 
 const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ documents, fileContents = [], selectedModel }) => {
   const [prompts, setPrompts] = useState<Record<string, string>>({
-    '标签': '请总结文档的主要内容'
+    '标签': ''
   });
   const [activeTab, setActiveTab] = useState<string>(Object.keys(prompts)[0]);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [newTabName, setNewTabName] = useState<string>(activeTab);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingTime, setLoadingTime] = useState<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchAIResponse = async (tab: string) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    setLoading(true);
+    setLoadingTime(0);
+    const interval = setInterval(() => setLoadingTime(prev => prev + 1), 1000);
+
     const prompt = prompts[tab];
     const messages: AIMessage[] = [
       ...fileContents.map(content => ({ role: 'system', content })),
@@ -25,11 +38,17 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ documents, fileContents =
     ];
     console.log(`[AI Request] 发送到大模型的消息: ${JSON.stringify(messages, null, 2)}`);
     try {
-      const response = await callAI(messages, selectedModel);
-      console.log(`[AI Response] ${tab} 返回的结果: ${response}`);
-      setPrompts(prev => ({ ...prev, [tab]: response }));
+      const response = await callAI(messages, selectedModel, abortController.signal);
+      const content = response.choices[0].message.content;
+      console.log(`[AI Response] ${tab} 返回的结果: ${content}`);
+      // 不覆盖用户的 prompt
     } catch (error) {
-      console.error(`Error fetching ${tab} data:`, error);
+      if (error.name !== 'AbortError') {
+        console.error(`Error fetching ${tab} data:`, error);
+      }
+    } finally {
+      clearInterval(interval);
+      setLoading(false);
     }
   };
 
@@ -116,7 +135,11 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ documents, fileContents =
       </div>
 
       <div className="flex-grow overflow-y-auto p-4" data-testid="content-area">
-        <ReactMarkdown>{prompts[activeTab]}</ReactMarkdown>
+        {loading ? (
+          <div>AI分析中...({loadingTime}s)</div>
+        ) : (
+          <ReactMarkdown>{prompts[activeTab]}</ReactMarkdown>
+        )}
       </div>
 
       {isModalOpen && (

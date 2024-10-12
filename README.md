@@ -24,7 +24,7 @@ DocSense 是一个 AI 驱动的文档分析平台，允许用户上传文档并�
 
 - **右侧面板（屏幕的 2/3）**：
   - 分析区域，包含多个标签页。
-  - 每个标签页右上角有一个提示设置按钮。
+  - 每个标签页右���角有一个提示设置按钮。
   - 初始有三个标签页，可以添加更多。
 
 ## 功能详情
@@ -121,15 +121,69 @@ DocSense 是一个 AI 驱动的文档分析平台，允许用户上传文档并�
 
 ## 核心逻辑
 
-- **标签页管理**
-  - 使用 `useState` 管理标签页的名称和内容。
-  - 通过 `handleAddTab` 和 `handleDeleteTab` 函数实现标签页的动态增删。
-  - 在设置弹窗中，通过 `handleSavePrompt` 函数更新标签名称和 prompt。
+以下是整个代码库的逻辑概述，涵盖了从文件上传到与 AI 模型交互的完整流程：
 
-- **文件上传**
-  - 在 `ChatPanel` 组件中使用 `FileReader` 读取文件内容。
-  - 通过 `onFilesChange` 回调函数将文件内容传递给父组件。
+1. **src/App.tsx**
+   - **状态管理**：
+     - `documents`：存储用户上传的文件对象。
+     - `fileContents`：存储文件的文本内容。
+   - **函数**：
+     - `handleUpload`：处理文件上传，将文件对象存储在 `documents` 状态中。
+     - `handleFilesChange`：更新文件内容，存储在 `fileContents` 状态中。
+   - **组件渲染**：
+     - 渲染 `ChatPanel` 和 `AnalysisPanel`，并通过 `props` 传递状态和回调函数。
 
-- **API 调用**
-  - 在 `aiService.ts` 中使用 `axios` 进行 API 调用。
-  - 通过 `callAI` 函数发送请求，并处理响应和错误。
+2. **src/components/ChatPanel.tsx**
+   - **状态管理**：
+     - `inputValue`：用户输入的消息。
+     - `messages`：存储对话消息。
+     - `selectedModel`：当前选择的 AI 模型。
+     - `isLoading`：指示 AI 响应是否正在加载。
+     - `uploadStatus`：文件上传状态。
+     - `fileContents`：存储上传文件的内容。
+     - `uploadedFiles`：存储上传的文件对象。
+   - **函数**：
+     - `handleModelChange`：处理 AI 模型的切换。
+     - `handleFileUpload`：处理文件上传，读取文件内容并更新状态。
+     - `handleDeleteFile`：删除已上传的文件。
+     - `handleSend`：发送用户消息并调用 AI。
+     - `handleKeyDown`：处理回车键发送消息。
+   - **组件渲染**：
+     - 显示上传的文件列表、对话消息和文件上传控件。
+
+3. **src/components/AnalysisPanel.tsx**
+   - **状态管理**：
+     - `prompts`：存储每个标签页的提示。
+     - `activeTab`：当前活动的标签页。
+     - `isModalOpen`：指示设置模态框是否打开。
+     - `newTabName`：新标签页的名称。
+     - `loading`：指示 AI 分析是否正在进行。
+     - `loadingTime`：记录分析加载时间。
+     - `abortControllerRef`：用于取消未完成的 AI 请求。
+   - **函数**：
+     - `fetchAIResponse`：调用 AI 分析当前标签页的内容。
+     - `handleSavePrompt`：保存用户配置的提示。
+     - `handleAddTab`：添加新的分析标签页。
+     - `handleDeleteTab`：删除现有的分析标签页。
+   - **组件渲染**：
+     - 显示分析标签页、设置按钮和分析结果。
+
+4. **src/services/aiService.ts**
+   - **API 配置**：
+     - `API_URL` 和 `API_KEY` 用于配置 API 请求。
+   - **函数**：
+     - `callAI`：使用 `axios` 发送请求到 AI 服务，处理响应和错误。
+
+5. **vite.config.ts**
+   - **代理配置**：
+     - 配置 Vite 的代理，将 `/v1` 的请求代理到指定的目标服务器。
+
+6. **test/test_api_call.py**
+   - **API 测试**：
+     - 使用 `requests` 库测试 API 调用，发送 POST 请求并打印响应。
+
+7. **run_test.sh 和 test/run_test.sh**
+   - **脚本功能**：
+     - 激活 Python 虚拟环境并运行 API 测试脚本。
+
+
