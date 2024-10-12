@@ -6,11 +6,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': {
+      '/v1': {
         target: 'https://p33279i881.vicp.fun',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
-      }
-    }
-  }
+        secure: false,
+        rewrite: (path) => path.replace(/^\/v1/, '/v1'),
+      },
+    },
+  },
 });

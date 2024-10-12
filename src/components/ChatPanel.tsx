@@ -1,27 +1,22 @@
 import React, { useState, ChangeEvent } from 'react';
-import { Send, Upload } from 'lucide-react';
 import { callAI, Message as AIMessage, ModelType } from '../services/aiService';
-
-// 删除这行，因为我们已经从 aiService 导入了 ModelType
-// type ModelType = 'moonshot-v1-8k' | 'moonshot-v1-32k' | 'moonshot-v1-128k' | 'moonshot-v1-auto';
+import { Send, Upload, Trash } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface ChatPanelProps {
   documents: File[];
   onUpload: (files: FileList) => void;
+  onFilesChange: (files: string[]) => void; // 新增回调函数
 }
 
-interface Message {
-  text: string;
-  isUser: boolean;
-}
-
-const ChatPanel: React.FC<ChatPanelProps> = ({ documents, onUpload }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+const ChatPanel: React.FC<ChatPanelProps> = ({ documents, onUpload, onFilesChange }) => {
+  const [inputValue, setInputValue] = useState('');
+  const [messages, setMessages] = useState<AIMessage[]>([]);
   const [selectedModel, setSelectedModel] = useState<ModelType>('moonshot-v1-8k');
-
-  // handleSend 函数保持不变
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [fileContents, setFileContents] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
   const handleModelChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const newModel = e.target.value as ModelType;
@@ -30,72 +25,104 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ documents, onUpload }) => {
   };
 
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
+    if (e.target.files && e.target.files.length > 0) {
       console.log('[User Action] 用户上传文件:', e.target.files);
       onUpload(e.target.files);
-      // 添加上传成功的提示
-      setMessages(prev => [...prev, { text: "文件上传成功！", isUser: false }]);
+      setUploadStatus('上传中...');
+
+      Array.from(e.target.files).forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const fileContent = event.target?.result as string;
+          setFileContents((prev) => {
+            const newContents = [...prev, fileContent];
+            onFilesChange(newContents); // 更新文件内容
+            return newContents;
+          });
+          setUploadedFiles((prev) => [...prev, file]);
+          setUploadStatus('上传成功！');
+          setMessages((prev) => [...prev, { role: 'system', content: `文件 ${file.name} 上传成功！` }]);
+          setTimeout(() => setUploadStatus(null), 3000);
+        };
+        reader.onerror = () => {
+          setUploadStatus('上传失败');
+        };
+        reader.readAsText(file); // 确保读取文件内容
+      });
     }
   };
 
+  const handleDeleteFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+    setFileContents((prev) => {
+      const newContents = prev.filter((_, i) => i !== index);
+      onFilesChange(newContents); // 更新文件内容
+      return newContents;
+    });
+  };
+
   const handleSend = async () => {
-    if (input.trim() && !isLoading) {
-      console.log('[User Action] 用户发送消息:', input);
-      const newMessages = [...messages, { text: input, isUser: true }];
-      setMessages(newMessages);
-      setInput('');
-      setIsLoading(true);
+    if (inputValue.trim() === '') return;
 
-      try {
-        console.log('[Chat Panel] 准备调用 AI');
-        const aiMessages: AIMessage[] = newMessages.map(msg => ({
-          role: msg.isUser ? 'user' : 'assistant',
-          content: msg.text
-        }));
+    const userMessage: AIMessage = { role: 'user', content: inputValue };
+    const combinedMessages = [
+      ...fileContents.map(content => ({ role: 'system', content })),
+      ...messages,
+      userMessage
+    ];
 
-        console.log('[Chat Panel] 选择的模型:', selectedModel);
-        const response = await callAI([
-          { role: 'system', content: '你是一个有帮助的助手，正在分析用户上传的文档。' },
-          ...aiMessages
-        ], selectedModel);
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
 
-        console.log('[Chat Panel] AI 响应:', response);
-        setMessages(prev => [...prev, { text: response, isUser: false }]);
-      } catch (error) {
-        console.error('[Chat Panel] AI 响应错误:', error);
-        let errorMessage = '抱歉，处理您的请求时出现了错误。';
-        if (error instanceof Error) {
-          errorMessage = `错误: ${error.message}`;
-        }
-        setMessages(prev => [...prev, { text: errorMessage, isUser: false }]);
-      } finally {
-        setIsLoading(false);
-      }
+    try {
+      const response = await callAI(combinedMessages, selectedModel);
+      const aiMessage: AIMessage = { role: 'assistant', content: response };
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('AI 响应错误:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      handleSend();
     }
   };
 
   return (
     <div className="h-full flex flex-col">
-      {/* 消息显示区域保持不变 */}
-      <div className="flex-grow overflow-y-auto mb-4">
-        {messages.map((message, index) => (
-          <div key={index} className={`mb-2 ${message.isUser ? 'text-right' : 'text-left'}`}>
-            <div className={`inline-block p-2 rounded-lg ${message.isUser ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
-              {message.text}
-            </div>
+      <div className="mb-4">
+        {uploadedFiles.map((file, index) => (
+          <div key={index} className="flex items-center justify-between bg-gray-100 p-2 mb-2 rounded">
+            <span>{file.name}</span>
+            <button onClick={() => handleDeleteFile(index)} className="text-red-500">
+              <Trash size={16} />
+            </button>
           </div>
         ))}
       </div>
+
+      <div className="flex-grow overflow-y-auto mb-4">
+        {messages.map((msg, index) => (
+          <div key={index} className={msg.role === 'user' ? 'text-right' : 'text-left'}>
+            <strong>{msg.role === 'user' ? '用户' : 'AI'}:</strong>
+            <ReactMarkdown>{msg.content}</ReactMarkdown>
+          </div>
+        ))}
+        {uploadStatus && <div className="text-center">{uploadStatus}</div>}
+      </div>
       
-      {/* 输入区域和按钮 */}
       <div className="flex mb-2">
         <input
           type="text"
-          value={input}
-          onChange={(e: ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="输入消息..."
           className="flex-grow border rounded-l px-2 py-1"
-          placeholder="输消息..."
-          disabled={isLoading}
         />
         <button 
           onClick={handleSend} 
@@ -106,7 +133,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ documents, onUpload }) => {
         </button>
       </div>
       
-      {/* 新增的上传和模型选择区域 */}
       <div className="flex justify-between items-center">
         <div>
           <input

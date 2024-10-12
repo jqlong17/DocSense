@@ -1,13 +1,20 @@
 import axios from 'axios';
 
-const API_URL = 'https://p33279i881.vicp.fun/v1/chat/completions';
-const API_KEY = 'sk-hw8jl0AvZ3SoFFPZ6a103bC7C15943569fC66002437c7f09';
+// API配置
+const API_URL = '/v1/chat/completions';
+const API_KEY = import.meta.env.VITE_AI_API_KEY; // 使用环境变量
 
+// 增加日志，检查API_KEY和API_URL是否正确加载
+console.log('Loaded API Key:', API_KEY ? 'Loaded' : 'Not Loaded');
+console.log('Request URL:', API_URL);
+
+// 消息接口定义
 export interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
+// 支持的AI模型类型
 export type ModelType = 
   | 'moonshot-v1-8k'
   | 'moonshot-v1-32k'
@@ -26,58 +33,33 @@ export type ModelType =
   | 'Tencent-HunYuan'
   | 'Moonshot-Kimi';
 
-export async function callAI(messages: Message[], model: ModelType = 'moonshot-v1-8k'): Promise<string> {
-  console.log(`[API Call] 开始调用 AI 模型: ${model}`);
-  console.log('[API Call] 发送的消息:', JSON.stringify(messages, null, 2));
-
+// 调用AI的函数
+export async function callAI(messages: Message[], model: ModelType) {
   try {
-    const payload = {
-      model: model,
-      messages: messages,
+    console.log('[API Call] 开始调用 AI');
+    const response = await axios.post(API_URL, {
+      model,
+      messages,
       stream: false
-    };
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_KEY}`
-    };
-
-    console.log('[API Call] 发送请求到:', API_URL);
-    console.log('[API Call] 请求头:', JSON.stringify(headers, null, 2));
-    console.log('[API Call] 请求体:', JSON.stringify(payload, null, 2));
-    console.time('API Response Time');
-    
-    const response = await axios.post(API_URL, payload, { 
-      headers,
-      timeout: 30000, // 设置30秒超时
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`
+      },
+      timeout: 60000 // 增加超时时间
     });
-    
-    console.timeEnd('API Response Time');
 
-    if (response.status === 200) {
-      console.log('[API Call] 成功接收响应');
-      console.log('[API Call] 响应内容:', response.data.choices[0].message.content);
-      return response.data.choices[0].message.content;
-    } else {
-      console.error(`[API Call] 请求失败: ${response.status} ${response.statusText}`);
-      throw new Error(`请求失败：${response.status} ${response.statusText}`);
-    }
+    console.log('[API Call] AI 调用成功:', response.data);
+    return response.data;
   } catch (error) {
-    console.error('[API Call] 调用 AI 时发生错误:', error);
     if (axios.isAxiosError(error)) {
-      if (error.response) {
-        console.error('[API Call] 响应数据:', error.response.data);
-        console.error('[API Call] 响应状态:', error.response.status);
-        console.error('[API Call] 响应头:', error.response.headers);
-      } else if (error.request) {
-        console.error('[API Call] 请求配置:', error.config);
-        console.error('[API Call] 请求详情:', error.request);
-      }
-      console.error('[API Call] 错误消息:', error.message);
-      throw new Error(`网络请求失败: ${error.message}`);
+      console.error('[API Call] 调用 AI 时发生错误:', error);
+      console.error('[API Call] 请求配置:', error.config);
+      console.error('[API Call] 请求详情:', error.request);
+      console.error('[API Call] 响应详情:', error.response ? error.response.data : '无响应');
     } else {
-      console.error('[API Call] 非 Axios 错误:', error);
-      throw new Error('未知错误，请查看控制台日志');
+      console.error('[API Call] 未知错误:', error);
     }
+    throw error;
   }
 }

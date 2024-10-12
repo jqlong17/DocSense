@@ -82,3 +82,17 @@
 - **Vite** 用于构建工具
 - **Tailwind CSS** 用于样式
 - **Lucide React** 用于图标
+
+## 组件命名
+
+以下是前端组件在后台的命名：
+
+- **Tab 按钮**：`data-testid="tab-button-{tabName}"` - 用于切换不同的分析标签页。
+- **设置按钮**：`data-testid="settings-button"` - 用于打开设置对话框。
+- **内容区域**：`data-testid="content-area"` - 显示当前选中标签页的内容。
+- **模态覆盖层**：`data-testid="modal-overlay"` - 模态对话框的背景层。
+- **设置对话框**：`data-testid="settings-dialog"` - 用于配置预设提示的对话框。
+- **提示输入框**：`data-testid="prompt-input"` - 用于输入或编辑预设提示。
+- **保存按钮**：`data-testid="save-button"` - 用于保存提示设置。
+- **左侧聊天面板**：`data-testid="chat-panel"` - 包含对话界面和文档上传功能。
+- **右侧分析面板**：`data-testid="analysis-panel"` - 包含分析区域和多个标签页。
